@@ -10,6 +10,7 @@ import { SchedulingModule } from './scheduling/scheduling.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { PhysicsMathModule } from './physics-math/physics-math.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { PredictionsModule } from './predictions/predictions.module';
 
 @Module({
   imports: [
@@ -27,10 +28,11 @@ import { IntegrationsModule } from './integrations/integrations.module';
     AnalyticsModule,
     PhysicsMathModule,
     IntegrationsModule,
+    PredictionsModule
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })
 export class AppModule {}

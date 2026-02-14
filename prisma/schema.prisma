@@ -42,6 +42,7 @@ model User {
   schedules        Schedule[]
   analytics        AnalyticsEvent[]
   physicsMathTasks PhysicsMathTask[]
+  predictions      Prediction[]
 }
 
 model Role {
@@ -93,4 +94,57 @@ model PhysicsMathTask {
   @@index([userId])
   @@index([status])
   @@index([taskType])
+}
+
+// --- Predictions Domain ---
+enum PredictionPlatform {
+  INSTAGRAM
+  YOUTUBE
+  X
+  LINKEDIN
+}
+
+enum PredictionContentType {
+  REEL
+  SHORT
+  POST
+  VIDEO
+}
+
+enum PredictionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model Prediction {
+  id        String   @id @default(uuid())
+  userId    String
+  platform  PredictionPlatform
+  contentType PredictionContentType
+  topic     String
+  region    String
+  timezone  String
+
+  llmRawOutput    Json?
+  scoredHashtags  Json?
+  scriptSuggestions Json?
+  bestPostingTime Json?
+  trafficForecast Json?
+  explanation     Json?
+
+  modelVersion String?
+  status       PredictionStatus @default(PENDING)
+  failureReason String?
+
+  idempotencyKey String?  @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([idempotencyKey])
 }
