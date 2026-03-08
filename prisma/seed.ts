@@ -1,28 +1,11 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole, PlanType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminRole = await prisma.role.upsert({
-    where: { name: 'ADMIN' },
-    update: {},
-    create: {
-      name: 'ADMIN',
-      permissions: ['users:read', 'users:write', 'schedules:*', 'analytics:*', 'compute:*', 'integrations:*'],
-    },
-  });
-
-  const userRole = await prisma.role.upsert({
-    where: { name: 'USER' },
-    update: {},
-    create: {
-      name: 'USER',
-      permissions: ['schedules:read', 'schedules:write', 'analytics:read', 'compute:*'],
-    },
-  });
-
   const hashedPassword = await bcrypt.hash('Admin123!', 10);
+
   await prisma.user.upsert({
     where: { email: 'admin@trendomic.com' },
     update: {},
@@ -31,16 +14,18 @@ async function main() {
       email: 'admin@trendomic.com',
       password: hashedPassword,
       role: UserRole.ADMIN,
-      roleId: adminRole.id,
+      plan: PlanType.ENTERPRISE,
+      dailyLimit: 1000,
+      isActive: true,
     },
   });
 
-  console.log('Seed completed.');
+  console.log('✅ Admin seed completed.');
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Seed error:', e);
     process.exit(1);
   })
   .finally(async () => {
