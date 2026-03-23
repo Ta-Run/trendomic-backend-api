@@ -16,7 +16,7 @@ export class AiService {
 
 
     const genAI = new GoogleGenerativeAI(key);
-    this.model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    this.model = genAI.getGenerativeModel({  model: 'gemini-3-flash-preview' });
   }
 
   async generatePredictionInsights(input: CreatePredictionDto) {
@@ -48,10 +48,34 @@ Return STRICT JSON in this format:
 }
 `;
 
-    const result = await this.model.generateContent(prompt);
+  const maxRetries = 3;
+  let attempt = 0;
+
+  while(attempt<maxRetries){
+
+    try {
+      const result = await this.model.generateContent(prompt);
     const text = result.response.text();
 
     return this.parseJson(text);
+      
+    } catch (error) {
+      if(error.status === 503){
+        attempt++;
+
+        const delay = Math.pow(2,attempt) *1000
+
+         this.logger.warn(
+          `Gemini 503 overload. Retrying attempt ${attempt} after ${delay}ms`,
+         )
+         await new Promise((resolve) => setTimeout(resolve, delay));
+      }else{
+         throw error; 
+      }      
+    }
+  }
+ throw new Error('Gemini service unavailable after retries');
+    
   }
 
   private parseJson(text: string) {

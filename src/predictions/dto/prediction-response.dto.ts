@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PredictionStatus } from '@prisma/client';
 
 export class HashtagScoreDto {
   @ApiProperty()
@@ -77,7 +78,7 @@ export class PredictionResultDto {
   id: string;
 
   @ApiProperty()
-  status: string;
+  status: PredictionStatus;
 
   @ApiPropertyOptional({ type: [HashtagScoreDto] })
   scoredHashtags?: HashtagScoreDto[];
@@ -98,7 +99,7 @@ export class PredictionResultDto {
   modelVersion?: string;
 
   @ApiProperty()
-  createdAt: string;
+  createdAt: Date;
 
   @ApiPropertyOptional()
   failureReason?: string;

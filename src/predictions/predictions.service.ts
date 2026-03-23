@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { AiService } from '../integrations/ai/ai.service';
 import { CreatePredictionDto } from './dto/create-prediction.dto';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   CreatePredictionResponseDto,
   PredictionResultDto,
@@ -12,81 +13,147 @@ import {
 export class PredictionsService {
   private predictions = new Map<string, PredictionResultDto>();
 
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+  private readonly aiService: AiService,
+  private readonly prisma: PrismaService,
+) {}
+
 
   async createPrediction(
-    dto: CreatePredictionDto,
-  ): Promise<CreatePredictionResponseDto> {
-    const id = randomUUID();
+  userId: string,
+  dto: CreatePredictionDto,
+): Promise<CreatePredictionResponseDto> {
 
-    // Set initial state
-    this.predictions.set(id, {
-      id,
-      status: 'PENDING',
-      createdAt: new Date().toISOString(),
-    } as PredictionResultDto);
+  // 1️⃣ Check daily limit
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
-    // Run async (simulate background job)
-    this.processPrediction(id, dto);
+  const todayCount = await this.prisma.prediction.count({
+    where: {
+      userId,
+      createdAt: { gte: todayStart },
+    },
+  });
 
-    return {
-      predictionId: id,
-      status: 'PENDING',
-    };
+  const user = await this.prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) throw new NotFoundException('User not found');
+
+  if (todayCount >= user.dailyLimit) {
+    throw new Error('Daily prediction limit exceeded');
   }
+
+  // 2️⃣ Create DB record (PENDING)
+  const prediction = await this.prisma.prediction.create({
+    data: {
+      userId,
+      platform: dto.platform,
+      contentType: dto.contentType,
+      topic: dto.topic,
+      region: dto.region,
+      status: 'PENDING',
+    },
+  });
+
+  // 3️⃣ Process async (later replace with BullMQ)
+  this.processPrediction(prediction.id, userId, dto);
+
+  return {
+    predictionId: prediction.id,
+    status: prediction.status,
+  };
+}
+
 
   private async processPrediction(
-    id: string,
-    dto: CreatePredictionDto,
-  ) {
-    try {
-      const aiData = await this.aiService.generatePredictionInsights(dto);
-    console.log('first workd')
-      const scoredHashtags: HashtagScoreDto[] =
-        aiData.hashtags.map((tag: string) => ({
-          tag,
-          score: this.calculateScore(tag),
-          tier: 'MEDIUM',
-          reason: 'AI + relevance based scoring',
-        }));
+  predictionId: string,
+  userId: string,
+  dto: CreatePredictionDto,
+) {
+  try {
+    // Mark as PROCESSING
+    await this.prisma.prediction.update({
+      where: { id: predictionId },
+      data: { status: 'PROCESSING' },
+    });
 
-        console.log('Second workd')
+    const startTime = Date.now();
 
-      const result: PredictionResultDto = {
-        id,
-        status: 'COMPLETED',
-        scoredHashtags,
-        scriptSuggestions: aiData.scripts,
-        bestPostingTime: this.calculateBestTime(),
-        trafficForecast: this.calculateForecast(),
+    const aiData = await this.aiService.generatePredictionInsights(dto);
+
+    const processingTime = Date.now() - startTime;
+
+    const scoredHashtags = aiData.hashtags.map((tag: string) => ({
+      tag,
+      score: this.calculateScore(tag),
+      tier: 'MEDIUM',
+      reason: 'AI + relevance based scoring',
+    }));
+
+    // Save AI result
+    await this.prisma.predictionResult.create({
+      data: {
+        predictionId,
+        hashtags: scoredHashtags,
+        scripts: aiData.scripts,
         explanation: aiData.explanation,
-        modelVersion: 'gemini-1.5-flash',
-        createdAt: new Date().toISOString(),
-      };
+      },
+    });
 
-      console.log('third workd')
+    // Update prediction
+    await this.prisma.prediction.update({
+      where: { id: predictionId },
+      data: {
+        status: 'COMPLETED',
+        tokensUsed: aiData.tokens ?? 0,
+        processingTimeMs: processingTime,
+        modelVersion: 'gemini-3-flash-preview',
+        completedAt: new Date(),
+      },
+    });
 
-      this.predictions.set(id, result);
-      console.log('fifth workd')
-    } catch (error) {
-      this.predictions.set(id, {
-        id,
+    // Log usage
+    await this.prisma.usageLog.create({
+      data: {
+        userId,
+        predictionId,
+        tokensUsed: aiData.tokens ?? 0,
+      },
+    });
+
+  } catch (error) {
+    await this.prisma.prediction.update({
+      where: { id: predictionId },
+      data: {
         status: 'FAILED',
-        createdAt: new Date().toISOString(),
-        failureReason: 'AI processing failed',
-      } as PredictionResultDto);
-    }
+        failureReason: error.message,
+      },
+    });
+  }
+}
+
+
+  async getPrediction(id: string): Promise<PredictionResultDto|any>{
+  const prediction = await this.prisma.prediction.findUnique({
+    where: { id },
+    include: { result: true },
+  });
+
+  if (!prediction) {
+    throw new NotFoundException('Prediction not found');
   }
 
-  async getPrediction(id: string): Promise<PredictionResultDto> {
-    const prediction = this.predictions.get(id);
+  return {
+    id: prediction.id,
+    status: prediction.status,
+    scoredHashtags:  (prediction.result?.hashtags) ?? [],
+    scriptSuggestions: prediction.result?.scripts ?? [],
+    explanation: prediction.result?.explanation ?? null,
+  };
+}
 
-    if (!prediction) {
-      throw new NotFoundException('Prediction not found');
-    }
-
-    return prediction;
-  }
 
   // 🔥 Temporary math logic
   private calculateScore(tag: string): number {

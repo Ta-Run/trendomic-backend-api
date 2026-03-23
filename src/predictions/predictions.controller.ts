@@ -4,6 +4,7 @@ import {
   Body,
   Get,
   Param,
+  Req
 } from '@nestjs/common';
 import { PredictionsService } from './predictions.service';
 import { CreatePredictionDto } from './dto/create-prediction.dto';
@@ -11,6 +12,7 @@ import {
   CreatePredictionResponseDto,
   PredictionResultDto,
 } from './dto/prediction-response.dto';
+import { Request } from 'express';
 
 @Controller('predictions')
 export class PredictionsController {
@@ -20,16 +22,18 @@ export class PredictionsController {
 
   @Post()
   async createPrediction(
+      @Req() req: Request,
     @Body() dto: CreatePredictionDto,
   ): Promise<CreatePredictionResponseDto> {
-    console.log('body====',Body)
-    return this.predictionsService.createPrediction(dto);
+     const userId = (req.user as any).id;
+    return this.predictionsService.createPrediction(userId ,dto);
   }
 
   @Get(':id')
   async getPrediction(
     @Param('id') id: string,
   ): Promise<PredictionResultDto> {
+    console.log('get api===')
     return this.predictionsService.getPrediction(id);
   }
 }
