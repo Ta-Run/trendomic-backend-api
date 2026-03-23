@@ -59,15 +59,20 @@ model User {
   isActive   Boolean  @default(true)
 
   refreshToken String?
+  credits      Int      @default(10)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  schedules   Schedule[]
-  analytics   AnalyticsEvent[]
-  mathTasks   PhysicsMathTask[]
-  predictions Prediction[]
-  usageLogs   UsageLog[]
+  schedules           Schedule[]
+  analytics           AnalyticsEvent[]
+  mathTasks           PhysicsMathTask[]
+  predictions         Prediction[]
+  usageLogs           UsageLog[]
+  GenerationHistory   GenerationHistory[]
+  CreditTransaction   CreditTransaction[]
+  Template            Template[]
+  engagementProfile   UserEngagementProfile?
 }
 
 //////////////////////////////////////////////////////
@@ -196,4 +201,79 @@ model UsageLog {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+//////////////////////////////////////////////////////
+// GENERATION HISTORY
+//////////////////////////////////////////////////////
+
+model GenerationHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  platform    String
+  topic       String
+  result      Json
+  viralScore  Int      @default(0)
+  r0Score     Float    @default(0)
+  chaosAlert  String?
+  creditsUsed Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+//////////////////////////////////////////////////////
+// CREDIT TRANSACTION
+//////////////////////////////////////////////////////
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  amount      Int
+  type        String   // 'DEDUCT' | 'PURCHASE' | 'SIGNUP_BONUS'
+  description String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+//////////////////////////////////////////////////////
+// TEMPLATE
+//////////////////////////////////////////////////////
+
+model Template {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  name        String
+  platform    String
+  topic       String
+  description String
+  isPublic    Boolean  @default(false)
+  usageCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([isPublic])
+}
+
+//////////////////////////////////////////////////////
+// USER ENGAGEMENT PROFILE
+//////////////////////////////////////////////////////
+
+model UserEngagementProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  bayesianWeights Json     @default("{}")
+  contentDNA      String?
+  nicheHistory    Json     @default("[]")
+  postCount       Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
 }

@@ -11,6 +11,11 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { PhysicsMathModule } from './physics-math/physics-math.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PredictionsModule } from './predictions/predictions.module';
+import { GenerationModule } from './generation/generation.module';
+import { CreditsModule } from './credits/credits.module';
+import { TemplatesModule } from './templates/templates.module';
+import { TrendingModule } from './trending/trending.module';
+import { ScientificEngineModule } from './scientific-engine/scientific-engine.module';
 
 @Module({
   imports: [
@@ -28,7 +33,12 @@ import { PredictionsModule } from './predictions/predictions.module';
     AnalyticsModule,
     PhysicsMathModule,
     IntegrationsModule,
-    PredictionsModule
+    PredictionsModule,
+    GenerationModule,
+    CreditsModule,
+    TemplatesModule,
+    TrendingModule,
+    ScientificEngineModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
